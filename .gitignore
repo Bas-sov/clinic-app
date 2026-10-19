@@ -1,0 +1,45 @@
+# ===== Python =====
+backend/venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ===== Node / фронтенд =====
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+
+# ===== Tauri (десктоп) =====
+src-tauri/target/
+
+# ===== Секреты =====
+.env
+.env.*
+!.env.example
+
+# ===== Данные =====
+# файлы, загруженные пользователями
+backend/uploads/
+# дампы и бэкапы БД
+*.dump
+*.backup
+
+# ===== Логи =====
+*.log
+logs/
+
+# ===== IDE =====
+.vscode/
+.idea/
+
+# ===== ОС =====
+.DS_Store
+Thumbs.db
+desktop.ini
