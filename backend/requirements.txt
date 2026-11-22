@@ -10,9 +10,12 @@ asyncpg==0.30.0
 pydantic-settings==2.6.1
 email-validator==2.2.0
 
+# База часовых поясов (на Windows своей нет, без неё ZoneInfo не работает)
+tzdata==2024.2
+
 # Безопасность: JWT и хеширование паролей/кодов
 PyJWT==2.10.1
-bcrypt==4.2.1
+argon2-cffi==23.1.0
 
 # Загрузка файлов (анализы) и form-data
 python-multipart==0.0.17
