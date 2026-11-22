@@ -1,0 +1,23 @@
+# Веб-фреймворк и сервер
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+
+# Работа с БД (PostgreSQL, асинхронно)
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+
+# Настройки и валидация
+pydantic-settings==2.6.1
+email-validator==2.2.0
+
+# Безопасность: JWT и хеширование паролей/кодов
+PyJWT==2.10.1
+bcrypt==4.2.1
+
+# Загрузка файлов (анализы) и form-data
+python-multipart==0.0.17
+
+# Тесты
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.28.1
