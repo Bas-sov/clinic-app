@@ -4,9 +4,13 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 CREATE TYPE slot_status AS ENUM ('free', 'booked', 'unavailable');
 
-CREATE TYPE appointment_status AS ENUM ('planned', 'canceled', 'completed', 'no_show');
+CREATE TYPE appointment_status AS ENUM ('planned', 'in_progress', 'canceled', 'completed', 'no_show');
 
 CREATE TYPE cancel_initiator AS ENUM ('patient', 'administrator');
+
+CREATE TYPE service_category AS ENUM ('consultation', 'analysis', 'procedure');
+
+CREATE TYPE analysis_status AS ENUM ('processing', 'ready');
 
 -- 1. ПАЦИЕНТЫ
 
@@ -49,6 +53,9 @@ CREATE TABLE doctors (
     phone VARCHAR(20) NOT NULL UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
+    experience_years SMALLINT CHECK (experience_years BETWEEN 0 AND 70),
+    cabinet VARCHAR(20),
+    education TEXT,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT chk_doctor_phone_format CHECK (phone ~ '^\+[0-9]{10,15}$'),
     CONSTRAINT chk_doctor_email_format CHECK (
@@ -64,17 +71,29 @@ CREATE INDEX idx_doctors_specialty ON doctors (specialty_id);
 CREATE TABLE services (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     specialty_id INT,
+    category service_category NOT NULL,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    price NUMERIC(10, 2) CHECK (price > 0),
+    price NUMERIC(10, 2) NOT NULL CHECK (price > 0),
+    duration_minutes INT NOT NULL CHECK (duration_minutes > 0),
+    preparation TEXT,
+    is_visible BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT chk_services_category_specialty CHECK (
+        (category = 'consultation') = (specialty_id IS NOT NULL)
+    ),
     CONSTRAINT fk_services_specialty FOREIGN KEY (specialty_id) REFERENCES specialties (id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
+
+CREATE UNIQUE INDEX uq_services_one_consultation_per_specialty ON services (specialty_id)
+WHERE
+    category = 'consultation';
 
 -- 5. РАСПИСАНИЕ ВРАЧЕЙ
 
 CREATE TABLE schedule (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    doctor_id INT NOT NULL,
+    doctor_id INT,
+    cabinet VARCHAR(20) NOT NULL,
     work_date DATE NOT NULL,
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
@@ -88,6 +107,17 @@ CREATE TABLE schedule (
     ),
     CONSTRAINT excl_schedule_no_overlap EXCLUDE USING gist (
         doctor_id
+        WITH
+            =,
+            tsrange (
+                work_date + start_time,
+                work_date + end_time
+            )
+        WITH
+            &&
+    ),
+    CONSTRAINT excl_schedule_cabinet_no_overlap EXCLUDE USING gist (
+        cabinet
         WITH
             =,
             tsrange (
@@ -121,6 +151,8 @@ CREATE TABLE appointments (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     patient_id INT NOT NULL,
     schedule_id INT NOT NULL,
+    service_id INT NOT NULL,
+    price NUMERIC(10, 2) NOT NULL CHECK (price > 0),
     status appointment_status NOT NULL DEFAULT 'planned',
     cancel_reason TEXT,
     canceled_at TIMESTAMPTZ,
@@ -155,6 +187,7 @@ CREATE TABLE appointments (
     ),
     CONSTRAINT fk_appointments_patient FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_appointments_schedule FOREIGN KEY (schedule_id) REFERENCES schedule (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_appointments_service FOREIGN KEY (service_id) REFERENCES services (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT unique_appointment_id_patient UNIQUE (id, patient_id)
 );
 
@@ -171,13 +204,21 @@ CREATE TABLE analyses (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     patient_id INT NOT NULL,
     appointment_id INT,
+    doctor_id INT,
     name VARCHAR(255) NOT NULL,
     analysis_date DATE NOT NULL,
+    status analysis_status NOT NULL DEFAULT 'processing',
     result TEXT,
     file_path VARCHAR(500),
     comment TEXT,
+    CONSTRAINT chk_analyses_ready_has_result CHECK (
+        status <> 'ready'
+        OR file_path IS NOT NULL
+        OR result IS NOT NULL
+    ),
     CONSTRAINT fk_analyses_patient FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT fk_analyses_appointment FOREIGN KEY (appointment_id, patient_id) REFERENCES appointments (id, patient_id) ON DELETE SET NULL (appointment_id) ON UPDATE CASCADE
+    CONSTRAINT fk_analyses_appointment FOREIGN KEY (appointment_id, patient_id) REFERENCES appointments (id, patient_id) ON DELETE SET NULL (appointment_id) ON UPDATE CASCADE,
+    CONSTRAINT fk_analyses_doctor FOREIGN KEY (doctor_id) REFERENCES doctors (id) ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 CREATE INDEX idx_analyses_patient ON analyses (patient_id);
@@ -187,9 +228,11 @@ CREATE TABLE sick_leaves (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     patient_id INT NOT NULL,
     doctor_id INT,
+    number VARCHAR(50) UNIQUE,
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
     diagnosis VARCHAR(255),
+    file_path VARCHAR(500),
     CONSTRAINT chk_sick_leaves_dates CHECK (end_date >= start_date),
     CONSTRAINT fk_sick_leaves_patient FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_sick_leaves_doctor FOREIGN KEY (doctor_id) REFERENCES doctors (id) ON DELETE SET NULL ON UPDATE CASCADE
@@ -204,7 +247,10 @@ CREATE TABLE certificates (
     doctor_id INT,
     type VARCHAR(255) NOT NULL,
     issue_date DATE NOT NULL,
+    valid_until DATE,
     description TEXT,
+    file_path VARCHAR(500),
+    CONSTRAINT chk_certificates_dates CHECK (valid_until >= issue_date),
     CONSTRAINT fk_certificates_patient FOREIGN KEY (patient_id) REFERENCES patients (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_certificates_doctor FOREIGN KEY (doctor_id) REFERENCES doctors (id) ON DELETE SET NULL ON UPDATE CASCADE
 );
@@ -216,9 +262,12 @@ CREATE TABLE prescriptions (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     appointment_id INT NOT NULL,
     prescription_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    valid_until DATE,
     medicine VARCHAR(255) NOT NULL,
     dosage VARCHAR(100),
     instructions TEXT,
+    file_path VARCHAR(500),
+    CONSTRAINT chk_prescriptions_dates CHECK (valid_until >= prescription_date),
     CONSTRAINT fk_prescriptions_appointment FOREIGN KEY (appointment_id) REFERENCES appointments (id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
