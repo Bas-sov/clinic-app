@@ -10,19 +10,12 @@ from app.core.errors import ForbiddenError, UnauthorizedError
 from app.core.security import InvalidTokenError, Role, TokenPayload, decode_token
 from app.db.session import get_session
 from app.models import Administrator, Doctor, Patient
-
-User = Patient | Doctor | Administrator
+from app.services.auth import User, load_active_user
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 # auto_error=False: отсутствие токена обрабатываем сами, чтобы ответ был в нашем формате.
 _bearer = HTTPBearer(auto_error=False)
-
-_MODEL_BY_ROLE: dict[Role, type[User]] = {
-    "patient": Patient,
-    "doctor": Doctor,
-    "admin": Administrator,
-}
 
 
 async def get_token_payload(
@@ -40,12 +33,7 @@ TokenDep = Annotated[TokenPayload, Depends(get_token_payload)]
 
 
 async def _load_user(session: AsyncSession, payload: TokenPayload) -> User:
-    user = await session.get(_MODEL_BY_ROLE[payload.role], payload.user_id)
-    if user is None:
-        raise UnauthorizedError("user_not_found", "Пользователь не найден")
-    if getattr(user, "is_active", True) is False:
-        raise UnauthorizedError("account_disabled", "Учётная запись отключена")
-    return user
+    return await load_active_user(session, payload.role, payload.user_id)
 
 
 def _require_role(role: Role) -> Callable[..., Awaitable[User]]:
