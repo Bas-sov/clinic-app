@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     login_code_max_attempts: int = Field(default=5, gt=0)
 
     clinic_timezone: str = "Europe/Moscow"
+    clinic_name: str = "Эконом Клиника"
+    clinic_address: str = "Москва, ул. Лесная, 8"
+    clinic_phone: str = "+74950000000"
+    clinic_email: str = "info@econom-clinic.ru"
+    clinic_working_hours: str = "Пн–Пт 08:00–20:00, Сб 09:00–15:00"
 
     upload_dir: Path = Path("uploads")
 
