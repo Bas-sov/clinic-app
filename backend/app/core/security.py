@@ -13,6 +13,7 @@ Role = Literal["patient", "doctor", "admin"]
 TokenType = Literal["access", "refresh"]
 
 LOGIN_CODE_LENGTH = 6
+PASSWORD_MIN_LENGTH = 8
 JWT_ALGORITHM = "HS256"
 
 _hasher = PasswordHasher()
