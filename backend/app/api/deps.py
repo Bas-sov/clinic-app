@@ -36,7 +36,7 @@ async def _load_user(session: AsyncSession, payload: TokenPayload) -> User:
     return await load_active_user(session, payload.role, payload.user_id)
 
 
-def _require_role(role: Role) -> Callable[..., Awaitable[User]]:
+def require_role(role: Role) -> Callable[..., Awaitable[User]]:
     async def dependency(session: SessionDep, payload: TokenDep) -> User:
         if payload.role != role:
             raise ForbiddenError("forbidden_role", "Недостаточно прав")
@@ -45,9 +45,9 @@ def _require_role(role: Role) -> Callable[..., Awaitable[User]]:
     return dependency
 
 
-CurrentPatient = Annotated[Patient, Depends(_require_role("patient"))]
-CurrentDoctor = Annotated[Doctor, Depends(_require_role("doctor"))]
-CurrentAdmin = Annotated[Administrator, Depends(_require_role("admin"))]
+CurrentPatient = Annotated[Patient, Depends(require_role("patient"))]
+CurrentDoctor = Annotated[Doctor, Depends(require_role("doctor"))]
+CurrentAdmin = Annotated[Administrator, Depends(require_role("admin"))]
 
 
 @dataclass(frozen=True)
